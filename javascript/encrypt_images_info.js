@@ -23,15 +23,6 @@ onUiUpdate(function () {
       parent.appendChild(info);
     }
     if (!info) return;
-    info.innerHTML = `
-<span>${
-      isEnable
-        ? "图片加密插件已经启用，图片将加密保存在服务器"
-        : "图片加密插件已安装但未启用"
-    }。
-<a rel="noopener noreferrer" target="_blank" href="https://github.com/viyiviyi/sd-encrypt-image">点击查看插件主页</a>
-</span>
-`;
   }
   renderInfo("txt", enable);
   renderInfo("img", enable);
