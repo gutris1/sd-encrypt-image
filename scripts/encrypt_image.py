@@ -207,9 +207,9 @@ if PILImage.Image.__name__ != 'EncryptedImage':
         
 if password:
     script_callbacks.on_app_started(app_started_callback)
-    print('图片加密已经启动 加密方式 3')
+    print('Image Encryption: Enabled.\nEncryption method 3')
     if not api_enable:
-        print('请添加启动参数 --api，否则不能正常查看图片')
+        print('Image Encryption: Disabled.\nMissing --api command line argument.')
 
 else:
-    print('图片加密插件已安装，但缺少密码参数未启动')
+    print('Image Encryption: Disabled.\nMissing password parameter.')
