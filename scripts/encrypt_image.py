@@ -145,6 +145,9 @@ def hook_http_request(app: FastAPI):
                 return await call_next(req)
 
             ext = file_path[file_path.rfind('.'):].lower()
+            if ext == '.tmp':
+                return await call_next(req)
+
             if ext in ['.png', '.jpg', '.jpeg', '.webp', '.avif']:
                 image = PILImage.open(file_path)
                 pnginfo = image.info or {}
