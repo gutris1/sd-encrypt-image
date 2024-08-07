@@ -66,7 +66,6 @@ class EncryptedImage(PILImage.Image):
 
         if not filename and hasattr(fp, "name") and _util.is_path(fp.name):
             filename = fp.name
-            print(f'filename = {filename}')
 
         if not filename or not password:
             super().save(fp, format=format, **params)
