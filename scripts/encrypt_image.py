@@ -13,7 +13,8 @@ from modules import shared, sd_models, script_callbacks, scripts as md_scripts, 
 from scripts.core.core import decrypt_image, decrypt_image_v2, decrypt_image_v3, get_sha256, encrypt_image_v3
 
 RST = '\033[0m'
-AR = f'\033[38;5;208m▶{RST}'
+ORG = '\033[38;5;208m'
+AR = f'{ORG}▶{RST}'
 BLUE = '\033[38;5;39m'
 RED = '\033[38;5;196m'
 TITLE = 'Image Encryption:'
@@ -23,9 +24,8 @@ lora_dir = shared.cmd_opts.lora_dir
 emb_dir  = shared.cmd_opts.embeddings_dir
 vae_dir  = Path(shared.models_path) / 'VAE'
 
-repo_dir = md_scripts.basedir()
 password = getattr(shared.cmd_opts, 'encrypt_pass', None)
-api_enable = getattr(shared.cmd_opts, 'api', False)
+image_extensions = ['.png', '.jpg', '.jpeg', '.webp', '.avif']
 
 class EncryptedImage(PILImage.Image):
     __name__ = "EncryptedImage"
@@ -71,6 +71,10 @@ class EncryptedImage(PILImage.Image):
             super().save(fp, format=format, **params)
             return
 
+        if filename and filename.lower().endswith('.tmp'):
+            super().save(fp, format=format, **params)
+            return
+
         if encryption_type in {'pixel_shuffle', 'pixel_shuffle_2', 'pixel_shuffle_3'}:
             super().save(fp, format=format, **params)
             return
@@ -105,9 +109,9 @@ class EncryptedImage(PILImage.Image):
 
         params.update(pnginfo=pnginfo)
         super().save(fp, format=self.format, **params)
-        self.paste(back_img)
         print(f"Encrypting: {filename}")
-            
+        self.paste(back_img)
+
 def hook_http_request(app: FastAPI):
     @app.middleware("http")
     async def image_decrypting(req: Request, call_next):
@@ -141,16 +145,13 @@ def hook_http_request(app: FastAPI):
         if endpoint.startswith('/file='):
             file_path = Path(endpoint[6:])
             ext = file_path.suffix.lower().split('?')[0]
-            if not ext or ext == '.tmp':
-                return await call_next(req)
 
-            if ext in ['.png', '.jpg', '.jpeg', '.webp', '.avif']:
+            if ext in image_extensions:
                 image = PILImage.open(file_path)
                 pnginfo = image.info or {}
 
                 if 'Encrypt' not in pnginfo or 'EncryptPwdSha' not in pnginfo:
                     EncryptedImage.from_image(image).save(file_path)
-
                     image = PILImage.open(file_path)
                     pnginfo = image.info or {}
 
@@ -206,15 +207,15 @@ def encrypt_in_dir(folder: str):
             print(f"Error processing {file_path}: {e}")
 
     for file_path in folder_path.rglob('*'):
-        if file_path.is_file() and file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.avif']:
+        if file_path.is_file() and file_path.suffix.lower() in image_extensions:
             process_image(file_path)
 
-    for subdirectory in folder_path.iterdir():
-        if subdirectory.is_dir():
-            actual_path = subdirectory.resolve()
+    for subdir in folder_path.iterdir():
+        if subdir.is_dir():
+            actual_path = subdir.resolve()
 
             for file_path in actual_path.rglob('*'):
-                if file_path.is_file() and file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.avif']:
+                if file_path.is_file() and file_path.suffix.lower() in image_extensions:
                     process_image(file_path)
 
 def encode_pil_to_base64(img: PILImage.Image):
@@ -257,30 +258,26 @@ def open(fp, *args, **kwargs):
         return img
 
     return EncryptedImage.from_image(img)
-        
-def api_middleware(app: FastAPI):
-    super_api_middleware(app)
-    hook_http_request(app)
 
 def app_started_callback(_: gr.Blocks, app: FastAPI):
+    app.middleware_stack = None
     set_shared_options()
+    hook_http_request(app)
 
     encrypt_in_dir(ckpt_dir)
     encrypt_in_dir(lora_dir)
     encrypt_in_dir(emb_dir)
     encrypt_in_dir(vae_dir)
 
+    app.build_middleware_stack()
+
 if password == '':
     msg = f'{AR} {TITLE} {RED}Disabled{RST}, --encrypt-pass value is empty.'
-elif not password and not api_enable:
-    msg = f'{AR} {TITLE} {RED}Disabled{RST}, Missing --encrypt-pass and --api command line argument.'
 elif not password:
     msg = f'{AR} {TITLE} {RED}Disabled{RST}, Missing --encrypt-pass command line argument.'
-elif not api_enable:
-    msg = f'{AR} {TITLE} {RED}Disabled{RST}, Missing --api command line argument.'
 else:
     script_callbacks.on_app_started(app_started_callback)
-    msg = f'{AR} {TITLE} {BLUE}Enabled{RST}, Encryption method 3.'
+    msg = f'{AR} {TITLE} {BLUE}Enabled{RST}, Encryption {ORG}3{RST}'
 
 print(msg)
 
@@ -294,4 +291,3 @@ if PILImage.Image.__name__ != 'EncryptedImage':
         PILImage.Image = EncryptedImage
         PILImage.open = open
         api.encode_pil_to_base64 = encode_pil_to_base64
-        api.api_middleware = api_middleware
