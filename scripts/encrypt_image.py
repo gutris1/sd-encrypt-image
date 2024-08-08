@@ -109,7 +109,7 @@ class EncryptedImage(PILImage.Image):
 
         params.update(pnginfo=pnginfo)
         super().save(fp, format=self.format, **params)
-        print(f"Encrypting: {filename}")
+        #print(f"Encrypting: {filename}")
         self.paste(back_img)
 
 def hook_http_request(app: FastAPI):
@@ -197,14 +197,11 @@ def encrypt_in_dir(folder: str):
         return
 
     def process_image(file_path: Path):
-        try:
-            img = PILImage.open(file_path)
-            pnginfo = img.info or {}
+        img = PILImage.open(file_path)
+        pnginfo = img.info or {}
 
-            if 'Encrypt' not in pnginfo or 'EncryptPwdSha' not in pnginfo:
-                EncryptedImage.from_image(img).save(file_path)
-        except Exception as e:
-            print(f"Error processing {file_path}: {e}")
+        if 'Encrypt' not in pnginfo or 'EncryptPwdSha' not in pnginfo:
+            EncryptedImage.from_image(img).save(file_path)
 
     for file_path in folder_path.rglob('*'):
         if file_path.is_file() and file_path.suffix.lower() in image_extensions:
