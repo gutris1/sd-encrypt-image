@@ -72,6 +72,7 @@ class EncryptedImage(PILImage.Image):
             return
 
         if filename and filename.lower().endswith('.tmp'):
+            super().save(fp, format=format, **params)
             return
 
         if encryption_type in {'pixel_shuffle', 'pixel_shuffle_2', 'pixel_shuffle_3'}:
