@@ -114,6 +114,30 @@ def hook_http_request(app: FastAPI):
         endpoint: str = req.scope.get('path', 'err')
         endpoint = '/' + endpoint.strip('/')
 
+        if endpoint.startswith('/infinite_image_browsing/image-thumbnail') or endpoint.startswith('/infinite_image_browsing/file'):
+            query_string: str = req.scope.get('query_string').decode('utf-8')
+            query_string = unquote(query_string)
+            if query_string and query_string.index('path=') >= 0:
+                query = query_string.split('&')
+                path = ''
+                for sub in query:
+                    if sub.startswith('path='):
+                        path = sub[sub.index('=') + 1:]
+                if path:
+                    endpoint = '/file=' + path
+
+        if endpoint.startswith('/sd_extra_networks/thumb'):
+            query_string: str = req.scope.get('query_string').decode('utf-8')
+            query_string = unquote(query_string)
+            if query_string and query_string.index('filename=') >= 0:
+                query = query_string.split('&')
+                path = ''
+                for sub in query:
+                    if sub.startswith('filename='):
+                        path = sub[sub.index('=') + 1:]
+                if path:
+                    endpoint = '/file=' + path
+
         if endpoint.startswith('/file='):
             file_path = Path(endpoint[6:])
             ext = file_path.suffix.lower().split('?')[0]
@@ -150,30 +174,6 @@ def hook_http_request(app: FastAPI):
                 image_data = buffered.getvalue()
                 response = Response(content=image_data, media_type="image/png")
                 return response
-
-        if endpoint.startswith('/infinite_image_browsing/image-thumbnail') or endpoint.startswith('/infinite_image_browsing/file'):
-            query_string: str = req.scope.get('query_string').decode('utf-8')
-            query_string = unquote(query_string)
-            if query_string and query_string.index('path=') >= 0:
-                query = query_string.split('&')
-                path = ''
-                for sub in query:
-                    if sub.startswith('path='):
-                        path = sub[sub.index('=') + 1:]
-                if path:
-                    endpoint = '/file=' + path
-
-        if endpoint.startswith('/sd_extra_networks/thumb'):
-            query_string: str = req.scope.get('query_string').decode('utf-8')
-            query_string = unquote(query_string)
-            if query_string and query_string.index('filename=') >= 0:
-                query = query_string.split('&')
-                path = ''
-                for sub in query:
-                    if sub.startswith('filename='):
-                        path = sub[sub.index('=') + 1:]
-                if path:
-                    endpoint = '/file=' + path
 
         return await call_next(req)
 
