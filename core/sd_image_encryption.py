@@ -25,7 +25,6 @@ Models = Path(models_path)
 image_exts = ['.png', '.jpg', '.jpeg', '.webp', '.avif']
 image_keys = ['Encrypt', 'EncryptPwdSha']
 tag_list = ['parameters', 'UserComment']
-headers = {'Cache-Control': 'public, max-age=2592000'}
 mismatch = "axes don't match array"
 
 def GetRange(input: str, offset: int, range_len=4):
@@ -211,14 +210,14 @@ def open(fp, *args, **kwargs):
             return EncryptedImage.from_image(img)
 
         except Exception as e:
-            print(f'Error in 234 : {fp} : {e}')
+            print(f'Error in 213 : {fp} : {e}')
             return None
 
         finally:
             img.close()
 
     except Exception as e:
-        print(f'Error in 241 : {fp} : {e}')
+        print(f'Error in 220 : {fp} : {e}')
         return None
 
 def encode_pil_to_base64(img: PILImage.Image):
@@ -235,7 +234,6 @@ def encode_pil_to_base64(img: PILImage.Image):
 _executor = ThreadPoolExecutor(max_workers=100)
 _semaphore_factory = lambda: asyncio.Semaphore(min(os.cpu_count() * 2, 10))
 _semaphores = {}
-p_cache = {}
 
 def imgResize(image, target_height=512):
     width, height = image.size
@@ -246,48 +244,44 @@ def imgResize(image, target_height=512):
     return image
 
 async def imgAsync(fp, should_resize=False):
-    loop = asyncio.get_running_loop()
-    if loop not in _semaphores:
-        _semaphores[loop] = _semaphore_factory()
-    semaphore = _semaphores[loop]
+    l = asyncio.get_running_loop()
+
+    if l not in _semaphores: _semaphores[l] = _semaphore_factory()
+    s = _semaphores[l]
 
     try:
-        async with semaphore:
-            if fp in p_cache:
-                return p_cache[fp]
-
+        async with s:
             try:
-                content = await loop.run_in_executor(
-                    _executor,
-                    lambda: imgProcess(fp, should_resize)
-                )
+                return await l.run_in_executor(_executor, lambda: imgProcess(fp, should_resize))
+
             except Exception as e:
-                print(f'Error in 288 : {fp}, Error: {e}')
+                print(f'Error in 258 : {fp}, Error: {e}')
                 return None
 
-            p_cache[fp] = content
-            return content
     except Exception as e:
-        print(f'Error in 294 : {fp}: {e}')
+        print(f'Error in 262 : {fp}: {e}')
+
         try:
-            with open(fp, 'rb') as f:
-                return f.read()
+            with open(fp, 'rb') as f: return f.read()
         except Exception as inner_e:
-            print(f'Error in 299 : {inner_e}')
+            print(f'Error in 267 : {inner_e}')
             return None
-    finally:
-        if fp in p_cache:
-            del p_cache[fp]
+
+    except Exception as e:
+        print(f'Error in 271 : {fp}: {e}')
+
+        try:
+            with open(fp, 'rb') as f: return f.read()
+        except Exception as inner_e:
+            print(f'Error in 276 : {inner_e}')
+            return None
 
 def imgProcess(fp, should_resize):
     try:
         with PILImage.open(fp) as image:
-            try:
-                image.verify()
-            except Exception as e:
-                print(f'Invalid image file: {fp}: {e}')
-                return None
+            image.verify()
 
+        with PILImage.open(fp) as image:
             if should_resize:
                 image = imgResize(image)
                 image.save(fp)
@@ -300,15 +294,15 @@ def imgProcess(fp, should_resize):
                     image = PILImage.open(fp)
                     pnginfo = image.info or {}
                 except Exception as e:
-                    print(f'Error in 326 : {fp}: {e}')
+                    print(f'Error in 297 : {fp}: {e}')
                     return None
 
             buffered = io.BytesIO()
             info = PngImagePlugin.PngInfo()
 
             for key, value in pnginfo.items():
-                if value is None or key == 'icc_profile':
-                    continue
+                if value is None or key == 'icc_profile': continue
+
                 if isinstance(value, bytes):
                     try:
                         info.add_text(key, value.decode('utf-8'))
@@ -323,8 +317,9 @@ def imgProcess(fp, should_resize):
 
             image.save(buffered, format=PngImagePlugin.PngImageFile.format, pnginfo=info)
             return buffered.getvalue()
+
     except Exception as e:
-        print(f'Error in 350 : {fp}: {e}')
+        print(f'Error in 322 : {fp}: {e}')
         return None
 
 async def img_req(endpoint, query, full_path, res):
@@ -361,7 +356,7 @@ def hook(app: FastAPI):
         endpoint = '/' + req.scope.get('path', 'err').strip('/')
 
         def query(): return req.scope.get('query_string', b'').decode('utf-8')
-        def res(content): return Response(content=content, media_type='image/png', headers=headers)
+        def res(content): return Response(content=content, media_type='image/png')
 
         lines, response = await img_req(endpoint=endpoint, query=query, full_path=Path, res=res)
         if lines: return response
@@ -381,7 +376,7 @@ def hook_starlette(app: FastAPI):
                 endpoint = '/' + scope.get('path', 'err').strip('/')
 
                 def query(): return scope.get('query_string', b'').decode('utf-8')
-                def res(content): return stares.Response(content=content, media_type='image/png', headers=headers)
+                def res(content): return stares.Response(content=content, media_type='image/png')
 
                 lines, response = await img_req(endpoint=endpoint, query=query, full_path=Path, res=res)
                 if lines:
